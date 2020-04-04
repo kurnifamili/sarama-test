@@ -100,6 +100,7 @@ func main() {
 			// `Consume` should be called inside an infinite loop, when a
 			// server-side rebalance happens, the consumer session will need to be
 			// recreated to get the new claims
+			log.Println("Starting sarama consumer..")
 			if err := client.Consume(ctx, strings.Split(topics, ","), &consumer); err != nil {
 				log.Panicf("Error from consumer: %v", err)
 			}
@@ -107,11 +108,14 @@ func main() {
 			if ctx.Err() != nil {
 				return
 			}
+
+			consumer.ready = make(chan bool)
+			log.Println("Reinitializing sarama consumer..")
 		}
 	}()
 
 	<-consumer.ready // Await till the consumer has been set up
-	log.Println("Sarama consumer up and running!...")
+	log.Println("Sarama consumer up and running!")
 
 	sigterm := make(chan os.Signal, 1)
 	signal.Notify(sigterm, syscall.SIGINT, syscall.SIGTERM)
@@ -153,7 +157,7 @@ func (consumer *Consumer) ConsumeClaim(session sarama.ConsumerGroupSession, clai
 	// The `ConsumeClaim` itself is called within a goroutine, see:
 	// https://github.com/Shopify/sarama/blob/master/consumer_group.go#L27-L29
 	for message := range claim.Messages() {
-		log.Printf("Message claimed: value = %s, timestamp = %v, topic = %s", string(message.Value), message.Timestamp, message.Topic)
+		log.Printf("Message value = %s, timestamp = %v, topic = %s, partition = %d", string(message.Value), message.Timestamp, message.Topic, message.Partition)
 		session.MarkMessage(message, "")
 	}
 
